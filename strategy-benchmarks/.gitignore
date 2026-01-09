@@ -2,7 +2,6 @@
 .kotlin/
 .idea/
 build/
-kotlin-js-store/
 .java-version
 benchmark/build/
 local.properties

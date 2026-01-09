@@ -1,0 +1,38 @@
+FILE: StructWithInheritance.kt
+    package foo.bar
+
+    public abstract interface SomeInterface : R|kotlin/Any| {
+    }
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec2 : R|foo/bar/SomeInterface| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec2f : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2f| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec3f : R|foo/bar/Vec2f| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|, z: R|kotlin/Float|): R|foo/bar/Vec3f| {
+            super<R|foo/bar/Vec2f|>(R|<local>/x|, R|<local>/y|)
+        }
+
+        public final val z: R|kotlin/Float| = R|<local>/z|
+            public get(): R|kotlin/Float|
+
+    }

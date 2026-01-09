@@ -1,0 +1,6 @@
+public abstract interface annotation class com/goharsha/kotlinstructs/NoLowering : java/lang/annotation/Annotation {
+}
+
+public abstract interface annotation class com/goharsha/kotlinstructs/Struct : java/lang/annotation/Annotation {
+}
+

@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+.idea/
+build/
+.java-version
+gradle-plugin/build/
+struct-api/build/
+struct-compiler/build/
+struct-compiler/test-gen/
+local.properties

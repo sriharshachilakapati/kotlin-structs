@@ -1,0 +1,15 @@
+FILE: StructWithOpen.kt
+    package foo.bar
+
+    @R|com/goharsha/kotlinstructs/Struct|() public open class Vec2f : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2f| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }

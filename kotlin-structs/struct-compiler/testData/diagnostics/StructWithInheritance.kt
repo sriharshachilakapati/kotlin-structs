@@ -12,8 +12,7 @@ class Vec2(
     val y: Float
 ) : SomeInterface<!> // should be an error
 
-@Struct
-class Vec2f(
+open class Vec2f(
     val x: Float,
     val y: Float
 )
@@ -23,4 +22,4 @@ class Vec3f(
     x: Float,
     y: Float,
     val z: Float
-) : <!FINAL_SUPERTYPE!>Vec2f<!>(x, y)<!> // should be an error
+) : Vec2f(x, y)<!> // should be an error

@@ -11,9 +11,9 @@ class Vec2(
 )
 
 val instance = Vec2(1.0f, 2.0f)
-val identicalHashCode = System.identityHashCode(<!IDENTITY_ON_STRUCT!>instance<!>)           // should be an error
-val identicalHashCode2 = System.identityHashCode(<!IDENTITY_ON_STRUCT!>Vec2(3.0f, 4.0f)<!>)  // should be an error
+val identicalHashCode = System.identityHashCode(<!FORBIDDEN_STRUCT_CASTING!>instance<!>)           // should be an error
+val identicalHashCode2 = System.identityHashCode(<!FORBIDDEN_STRUCT_CASTING!>Vec2(3.0f, 4.0f)<!>)  // should be an error
 
 class Test(anyVal: Any)
 
-val testInstance = Test(<!IDENTITY_ON_STRUCT!>instance<!>)  // should be an error
+val testInstance = Test(<!FORBIDDEN_STRUCT_CASTING!>instance<!>)  // should be an error

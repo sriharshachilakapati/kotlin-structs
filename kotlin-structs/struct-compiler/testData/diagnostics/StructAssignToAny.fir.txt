@@ -1,0 +1,24 @@
+FILE: StructAssignToAny.kt
+    package foo.bar
+
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec2 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    public final fun main(): R|kotlin/Unit| {
+        lval instance: R|foo/bar/Vec2| = R|foo/bar/Vec2.Vec2|(Float(1.0), Float(2.0))
+        lvar anyVal2: R|kotlin/Any?| = Null(null)
+        R|<local>/anyVal2| = R|<local>/instance|
+        lval anyVal: R|kotlin/Any| = R|<local>/instance|
+        lval anyArray: R|kotlin/Array<kotlin/Any?>| = R|kotlin/arrayOfNulls|<R|kotlin/Any?|>(Int(1))
+        R|<local>/anyArray|.R|SubstitutionOverride<kotlin/Array.set: R|kotlin/Unit|>|(Int(0), R|<local>/instance|)
+        Unit
+    }

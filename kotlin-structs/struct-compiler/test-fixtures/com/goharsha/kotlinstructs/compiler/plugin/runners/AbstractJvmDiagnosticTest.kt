@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.test.directives.CodegenTestDirectives
 import org.jetbrains.kotlin.test.directives.DiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.FirDiagnosticsDirectives
 import org.jetbrains.kotlin.test.directives.JvmEnvironmentConfigurationDirectives
+import org.jetbrains.kotlin.test.directives.LanguageSettingsDirectives
 import org.jetbrains.kotlin.test.runners.AbstractFirPhasedDiagnosticTest
 import org.jetbrains.kotlin.test.services.EnvironmentBasedStandardLibrariesPathProvider
 import org.jetbrains.kotlin.test.services.KotlinStandardLibrariesPathProvider
@@ -29,6 +30,7 @@ open class AbstractJvmDiagnosticTest : AbstractFirPhasedDiagnosticTest(FirParser
          */
         defaultDirectives {
             +FirDiagnosticsDirectives.FIR_DUMP
+            +FirDiagnosticsDirectives.RENDER_DIAGNOSTICS_MESSAGES
             +FirDiagnosticsDirectives.DISABLE_GENERATED_FIR_TAGS
             +JvmEnvironmentConfigurationDirectives.FULL_JDK
 

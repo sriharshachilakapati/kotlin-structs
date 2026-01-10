@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.name.StandardClassIds
 import kotlin.math.min
 
-object StructIdentityFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
+object StructFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(expression: FirFunctionCall) {
@@ -33,7 +33,7 @@ object StructIdentityFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind
 
             // If the function parameter takes Any, we shouldn't be passing a struct type here
             if (paramType.classId == StandardClassIds.Any && argType.isStruct(context.session)) {
-                reporter.reportOn(arguments[i].source, StructErrors.IDENTITY_ON_STRUCT)
+                reporter.reportOn(arguments[i].source, StructErrors.FORBIDDEN_STRUCT_CASTING)
             }
         }
     }

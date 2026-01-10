@@ -19,3 +19,11 @@ FILE: StructIdentyHashCode.kt
         public get(): R|kotlin/Int|
     public final val identicalHashCode2: R|kotlin/Int| = Q|java/lang/System|.R|java/lang/System.identityHashCode*s|(R|foo/bar/Vec2.Vec2|(Float(3.0), Float(4.0)))
         public get(): R|kotlin/Int|
+    public final class Test : R|kotlin/Any| {
+        public constructor(anyVal: R|kotlin/Any|): R|foo/bar/Test| {
+            super<R|kotlin/Any|>()
+        }
+
+    }
+    public final val testInstance: R|foo/bar/Test| = R|foo/bar/Test.Test|(R|foo/bar/instance|)
+        public get(): R|foo/bar/Test|

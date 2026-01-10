@@ -10,7 +10,10 @@ import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirFunctionCallChec
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.expressions.arguments
 import org.jetbrains.kotlin.fir.references.toResolvedFunctionSymbol
+import org.jetbrains.kotlin.fir.types.classId
 import org.jetbrains.kotlin.fir.types.resolvedType
+import org.jetbrains.kotlin.name.StandardClassIds
+import kotlin.math.min
 
 object StructIdentityFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
 
@@ -18,15 +21,19 @@ object StructIdentityFunctionCallChecker : FirFunctionCallChecker(MppCheckerKind
     override fun check(expression: FirFunctionCall) {
         val callee = expression.calleeReference.toResolvedFunctionSymbol() ?: return
 
-        if (callee.callableId.packageName.asString() == "java.lang" &&
-            callee.callableId.className?.asString() == "System" &&
-            callee.callableId.callableName.asString() == "identityHashCode"
-        ) {
+        val parameters = callee.valueParameterSymbols
+        val arguments = expression.arguments
 
-            val argType = expression.arguments.firstOrNull()?.resolvedType ?: return
+        // Defensive programming: Ensure we don't go out of bounds
+        val count = min(parameters.size, arguments.size)
 
-            if (argType.isStruct(context.session)) {
-                reporter.reportOn(expression.source, StructErrors.IDENTITY_ON_STRUCT)
+        for (i in 0 until count) {
+            val paramType = parameters[i].resolvedReturnType
+            val argType = arguments[i].resolvedType
+
+            // If the function parameter takes Any, we shouldn't be passing a struct type here
+            if (paramType.classId == StandardClassIds.Any && argType.isStruct(context.session)) {
+                reporter.reportOn(arguments[i].source, StructErrors.IDENTITY_ON_STRUCT)
             }
         }
     }

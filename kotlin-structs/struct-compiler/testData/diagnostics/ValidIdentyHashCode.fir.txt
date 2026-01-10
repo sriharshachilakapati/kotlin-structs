@@ -1,0 +1,21 @@
+FILE: ValidIdentyHashCode.kt
+    package foo.bar
+
+    public final class Vec2 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    public final val instance: R|foo/bar/Vec2| = R|foo/bar/Vec2.Vec2|(Float(1.0), Float(2.0))
+        public get(): R|foo/bar/Vec2|
+    public final val identicalHashCode: R|kotlin/Int| = Q|java/lang/System|.R|java/lang/System.identityHashCode*s|(R|foo/bar/instance|)
+        public get(): R|kotlin/Int|
+    public final val identicalHashCode2: R|kotlin/Int| = Q|java/lang/System|.R|java/lang/System.identityHashCode*s|(R|foo/bar/Vec2.Vec2|(Float(3.0), Float(4.0)))
+        public get(): R|kotlin/Int|

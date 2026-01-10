@@ -1,0 +1,48 @@
+FILE: StructForbiddenCasting.kt
+    package foo.bar
+
+    public final class Vec3 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|, z: R|kotlin/Float|): R|foo/bar/Vec3| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+        public final val z: R|kotlin/Float| = R|<local>/z|
+            public get(): R|kotlin/Float|
+
+    }
+    public final val instance1: R|foo/bar/Vec3| = R|foo/bar/Vec3.Vec3|(Float(1.0), Float(2.0), Float(3.0))
+        public get(): R|foo/bar/Vec3|
+    public final val instanceAsAny1: R|kotlin/Any| = (R|foo/bar/instance1| as R|kotlin/Any|)
+        public get(): R|kotlin/Any|
+    public final val isInstanceAsAny1Vec3: R|kotlin/Boolean| = (R|foo/bar/instanceAsAny1| is R|foo/bar/Vec3|)
+        public get(): R|kotlin/Boolean|
+    public final val isInstanceAsAny1NotVec3: R|kotlin/Boolean| = (R|foo/bar/instanceAsAny1| !is R|foo/bar/Vec3|)
+        public get(): R|kotlin/Boolean|
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec2 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    public final val instance2: R|foo/bar/Vec2| = R|foo/bar/Vec2.Vec2|(Float(1.0), Float(2.0))
+        public get(): R|foo/bar/Vec2|
+    public final val instanceAsAny2: R|kotlin/Any| = (R|foo/bar/instance2| as R|kotlin/Any|)
+        public get(): R|kotlin/Any|
+    public final val isInstanceAsAny2Vec2: R|kotlin/Boolean| = (R|foo/bar/instanceAsAny2| is R|foo/bar/Vec2|)
+        public get(): R|kotlin/Boolean|
+    public final val isInstanceAsAny2NotVec2: R|kotlin/Boolean| = (R|foo/bar/instanceAsAny2| !is R|foo/bar/Vec2|)
+        public get(): R|kotlin/Boolean|
+    public final val isInstanceAsAny2NotVec3: R|kotlin/Boolean| = (R|foo/bar/instanceAsAny2| !is R|foo/bar/Vec3|)
+        public get(): R|kotlin/Boolean|

@@ -2,7 +2,6 @@ package com.goharsha.kotlinstructs.compiler.plugin.services
 
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.enableDebugMode
 import org.jetbrains.kotlin.test.builders.TestConfigurationBuilder
 import org.jetbrains.kotlin.test.model.TestModule
 import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
@@ -12,7 +11,6 @@ import java.io.File
 
 private val annotationsRuntimeClasspath =
     System.getProperty("annotationsRuntime.classpath")?.split(File.pathSeparator)?.map(::File)
-        ?.also { println("Classpath files: ${it.map(File::getPath)}") }
         ?: error("Unable to get a valid classpath from 'annotationsRuntime.classpath' property")
 
 fun TestConfigurationBuilder.configureAnnotations() {

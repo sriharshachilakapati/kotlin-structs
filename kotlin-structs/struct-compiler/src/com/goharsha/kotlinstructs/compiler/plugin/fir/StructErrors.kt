@@ -8,6 +8,8 @@ object StructErrors : KtDiagnosticsContainer() {
     val VAR_FIELD_IN_STRUCT by error0<PsiElement>()
     val INHERITANCE_IN_STRUCT by error0<PsiElement>()
     val NON_FINAL_STRUCT by error0<PsiElement>()
+    val IDENTITY_ON_STRUCT by error0<PsiElement>()
+    val FORBIDDEN_STRUCT_CASTING by error0<PsiElement>()
 
     override fun getRendererFactory() = StructErrorMessages
 }

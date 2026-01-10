@@ -61,8 +61,6 @@ tasks.test {
     useJUnitPlatform()
     workingDir = rootDir
 
-    println("Classpath for annotations runtime: ${annotationsRuntimeClasspath.asPath}")
-
     systemProperty("annotationsRuntime.classpath", annotationsRuntimeClasspath.asPath)
 
     // Properties required to run the internal test framework.

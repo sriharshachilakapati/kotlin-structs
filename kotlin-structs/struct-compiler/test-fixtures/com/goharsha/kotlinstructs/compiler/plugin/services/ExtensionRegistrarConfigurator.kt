@@ -1,6 +1,6 @@
 package com.goharsha.kotlinstructs.compiler.plugin.services
 
-import com.goharsha.kotlinstructs.compiler.plugin.StructsPluginRegistrar
+import com.goharsha.kotlinstructs.compiler.plugin.fir.StructsFirExtensionRegistrar
 import com.goharsha.kotlinstructs.compiler.plugin.ir.StructsIrGenerationExtension
 
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
@@ -22,7 +22,7 @@ private class ExtensionRegistrarConfigurator(testServices: TestServices) : Envir
         module: TestModule,
         configuration: CompilerConfiguration
     ) {
-        FirExtensionRegistrarAdapter.registerExtension(StructsPluginRegistrar())
+        FirExtensionRegistrarAdapter.registerExtension(StructsFirExtensionRegistrar())
         IrGenerationExtension.registerExtension(StructsIrGenerationExtension())
     }
 }

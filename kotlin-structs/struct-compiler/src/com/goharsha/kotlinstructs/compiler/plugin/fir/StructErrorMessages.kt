@@ -20,5 +20,15 @@ object StructErrorMessages : BaseDiagnosticRendererFactory() {
             StructErrors.NON_FINAL_STRUCT,
             "Structs must be declared as 'final'. Remove any 'open' or 'abstract' modifiers from the struct declaration."
         )
+
+        map.put(
+            StructErrors.IDENTITY_ON_STRUCT,
+            "Structs do not support identity operations (e.g., '===' or '!=='). Use structural equality ('==' or '!=') instead."
+        )
+
+        map.put(
+            StructErrors.FORBIDDEN_STRUCT_CASTING,
+            "Struct types may be erased during compile time and lack identity at runtime. Casting involving struct types is therefore forbidden."
+        )
     }
 }

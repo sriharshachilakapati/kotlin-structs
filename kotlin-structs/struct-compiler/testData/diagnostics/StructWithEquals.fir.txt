@@ -1,0 +1,23 @@
+FILE: StructWithEquals.kt
+    package foo.bar
+
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec2 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    public final val a: R|foo/bar/Vec2| = R|foo/bar/Vec2.Vec2|(Float(1.0), Float(2.0))
+        public get(): R|foo/bar/Vec2|
+    public final val b: R|foo/bar/Vec2| = R|foo/bar/Vec2.Vec2|(Float(3.0), Float(4.0))
+        public get(): R|foo/bar/Vec2|
+    public final val areEqual: R|kotlin/Boolean| = ==(R|foo/bar/a|, R|foo/bar/b|)
+        public get(): R|kotlin/Boolean|
+    public final val areNotEqual: R|kotlin/Boolean| = !=(R|foo/bar/a|, R|foo/bar/b|)
+        public get(): R|kotlin/Boolean|

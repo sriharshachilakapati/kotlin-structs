@@ -1,6 +1,7 @@
 package com.goharsha.kotlinstructs.compiler.plugin
 
 import com.goharsha.kotlinstructs.BuildConfig
+import com.goharsha.kotlinstructs.compiler.plugin.fir.StructsFirExtensionRegistrar
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -17,7 +18,7 @@ class StructsPluginComponentRegistrar: CompilerPluginRegistrar() {
         get() = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-        FirExtensionRegistrarAdapter.registerExtension(StructsPluginRegistrar())
+        FirExtensionRegistrarAdapter.registerExtension(StructsFirExtensionRegistrar())
         IrGenerationExtension.registerExtension(StructsIrGenerationExtension())
     }
 }

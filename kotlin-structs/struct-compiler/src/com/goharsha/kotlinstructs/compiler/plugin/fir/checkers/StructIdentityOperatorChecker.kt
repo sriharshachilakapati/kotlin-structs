@@ -1,6 +1,6 @@
 package com.goharsha.kotlinstructs.compiler.plugin.fir.checkers
 
-import com.goharsha.kotlinstructs.compiler.plugin.fir.StructErrors.IDENTITY_ON_STRUCT
+import com.goharsha.kotlinstructs.compiler.plugin.fir.diagnostics.StructErrors.IDENTITY_ON_STRUCT
 import com.goharsha.kotlinstructs.compiler.plugin.fir.isStruct
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn

@@ -1,4 +1,4 @@
-package com.goharsha.kotlinstructs.compiler.plugin.fir
+package com.goharsha.kotlinstructs.compiler.plugin.fir.diagnostics
 
 import com.goharsha.kotlinstructs.BuildConfig
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticFactoryToRendererMap

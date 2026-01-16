@@ -1,0 +1,38 @@
+FILE: StructReturnToAny.kt
+    package foo.bar
+
+    @R|com/goharsha/kotlinstructs/Struct|() public final class Vec2 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|): R|foo/bar/Vec2| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+    }
+    public final class Vec3 : R|kotlin/Any| {
+        public constructor(x: R|kotlin/Float|, y: R|kotlin/Float|, z: R|kotlin/Float|): R|foo/bar/Vec3| {
+            super<R|kotlin/Any|>()
+        }
+
+        public final val x: R|kotlin/Float| = R|<local>/x|
+            public get(): R|kotlin/Float|
+
+        public final val y: R|kotlin/Float| = R|<local>/y|
+            public get(): R|kotlin/Float|
+
+        public final val z: R|kotlin/Float| = R|<local>/z|
+            public get(): R|kotlin/Float|
+
+    }
+    public final fun returnsAny(): R|kotlin/Any| {
+        lval instance: R|foo/bar/Vec2| = R|foo/bar/Vec2.Vec2|(Float(1.0), Float(2.0))
+        ^returnsAny R|<local>/instance|
+    }
+    public final fun returnsAny2(): R|kotlin/Any| {
+        lval instance: R|foo/bar/Vec3| = R|foo/bar/Vec3.Vec3|(Float(1.0), Float(2.0), Float(3.0))
+        ^returnsAny2 R|<local>/instance|
+    }

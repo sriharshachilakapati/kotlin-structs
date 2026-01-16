@@ -5,6 +5,7 @@ import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructClassValidi
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructForbiddenCastChecker
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructIdentityOperatorChecker
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructPropertyDeclarationChecker
+import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructReturnChecker
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructVariableAssignmentChecker
 import com.goharsha.kotlinstructs.compiler.plugin.fir.diagnostics.StructErrors
 import org.jetbrains.kotlin.fir.FirSession
@@ -14,6 +15,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirPropertyChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.ExpressionCheckers
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirEqualityOperatorCallChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirFunctionCallChecker
+import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirReturnExpressionChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirTypeOperatorCallChecker
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirVariableAssignmentChecker
 import org.jetbrains.kotlin.fir.analysis.extensions.FirAdditionalCheckersExtension
@@ -49,5 +51,8 @@ class StructsFirCheckersExtension(session: FirSession) : FirAdditionalCheckersEx
 
         override val variableAssignmentCheckers: Set<FirVariableAssignmentChecker> =
             setOf(StructVariableAssignmentChecker)
+
+        override val returnExpressionCheckers: Set<FirReturnExpressionChecker> =
+            setOf(StructReturnChecker)
     }
 }

@@ -1,10 +1,10 @@
 # V1: Struct-like Immutable Types via Compiler Plugin
 
-**Author(s):**  Sri Harsha Chilakapati
+**Author(s):**  Sri Harsha Chilakapati  
 **Status:** Draft  
 **Target Kotlin version:** 2.3+ (K2 only)  
 **Related:** Value Classes, Project Valhalla  
-**Implementation:** Compiler plugin (FIR + IR)
+**Implementation:** Compiler plugin (FIR + IR)  
 
 ---
 
@@ -225,19 +225,19 @@ operator fun plus(a: Vec2, b: Vec2): Vec2
 The compiler plugin generates:
 
 ```kotlin
-internal class MutableVec2(
+internal class StructCarrier$Vec2(
     var x: Float,
     var y: Float
 )
 ```
 
-And lowered functions such as:
+And rewrite functions to lowered form:
 
 ```kotlin
-fun Vec2_plus(
+fun __structFn$Vec2$plus(
     ax: Float, ay: Float,
     bx: Float, by: Float,
-    out: MutableVec2
+    out: StructCarrier$Vec2
 )
 ```
 
@@ -254,8 +254,8 @@ val c = a + b
 Lowered IR (conceptually):
 
 ```kotlin
-val tmp = MutableVec2(0f, 0f)
-Vec2_plus(a.x, a.y, b.x, b.y, tmp)
+val tmp = StructCarrier$Vec2(0f, 0f)
+__structFn$Vec2$plus(a.x, a.y, b.x, b.y, tmp)
 ```
 
 Allocation responsibility is moved to the caller, enabling reuse and avoiding escapes.
@@ -288,7 +288,7 @@ Allocation responsibility is moved to the caller, enabling reuse and avoiding es
 - Validate constraints
 - Declare generated symbols
 - Attach metadata
-- Respect `@NoLowering`
+- Respect `@ExposeAbi`
 
 ### 13.2 IR Phase Responsibilities
 
@@ -309,17 +309,7 @@ Allocation responsibility is moved to the caller, enabling reuse and avoiding es
 
 ### 14.2 Runtime Correctness Tests
 
-```kotlin
-@NoLowering
-fun normal(): Float = ...
-
-fun lowered(): Float = ...
-
-@Test
-fun sameResult() {
-    assertEquals(normal(), lowered())
-}
-```
+TODO: Expand
 
 ---
 

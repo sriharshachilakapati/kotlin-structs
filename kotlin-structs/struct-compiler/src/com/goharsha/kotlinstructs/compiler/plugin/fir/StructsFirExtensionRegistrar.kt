@@ -6,6 +6,7 @@ import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructForbiddenCa
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructIdentityOperatorChecker
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructPropertyDeclarationChecker
 import com.goharsha.kotlinstructs.compiler.plugin.fir.checkers.StructVariableAssignmentChecker
+import com.goharsha.kotlinstructs.compiler.plugin.fir.diagnostics.StructErrors
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.DeclarationCheckers
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirClassChecker
@@ -21,6 +22,8 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 class StructsFirExtensionRegistrar : FirExtensionRegistrar() {
     override fun ExtensionRegistrarContext.configurePlugin() {
         +::StructsFirCheckersExtension
+
+        registerDiagnosticContainers(StructErrors)
     }
 }
 

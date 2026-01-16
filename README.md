@@ -70,9 +70,9 @@ The compiler plugin rewrites this into **mutable-carrier-based code** internally
 ```
 .
 ├── kotlin-structs/
-│   ├── struct-api/        # Public annotations (e.g., @Struct, @NoLowering)
+│   ├── struct-api/        # Public annotations (e.g., @Struct, @ExposeAbi)
 │   ├── struct-compiler/   # K2 compiler plugin (FIR + IR)
-│   └── struct-runtime/    # Minimal shared utilities (expect/actual)
+│   └── gradle-plugin/     # Gradle plugin to apply the compiler plugin
 │
 ├── strategy-benchmarks/   # KMP benchmarks used for evaluation
 ├── docs/                  # Design documents, proposals, KEEP-style specs

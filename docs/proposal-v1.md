@@ -113,7 +113,6 @@ A struct class must satisfy the following constraints:
     - Enums
     - Other `@Struct` types
 - No observable identity.
-- Deterministic initialization.
 
 **Allowed:**
 
@@ -132,47 +131,6 @@ class Rectangle(
 - Inheritance from another class or interface.
 - Custom `equals`, `hashCode`, or `toString` implementations.
 - Identity checks (`===`, `!==`).
-- Impure initialization
-
-**Example (invalid):**
-
-```kotlin
-@Struct
-class InvalidStruct(val x: Float) {
-    init {
-        println("Impure init") // Not allowed
-    }
-}
-```
-
-**Reasoning:**
-
-Struct lowering removes instance creation; side effects tied to construction would silently disapper if the struct is optimized away. Hence we prevent such cases at compile time using FIR diagnostics.
-
-#### 3.1.3. Secondary Constructors
-
-Secondary constructors are **allowed** if they are pure and delegate to the primary constructor.
-
-**Example (valid):**
-
-```kotlin
-@Struct
-class Rectangle(
-    val x: Float,
-    val y: Float,
-    val width: Float,
-    val height: Float
-) {
-    constructor(point: Vec2, size: Vec2)
-        : this(point.x, point.y, size.x, size.y)
-}
-```
-
-**Reasoning:**
-
-- Delegation is purely structural
-- No observable side effects
-- Can be safely inlined during lowering
 
 ### 3.2. The @ExposeAbi Annotation
 
@@ -187,7 +145,7 @@ fun getOrigin(): Vec2 {
 }
 ```
 
-By default, functions returning structs are lowered to avoid allocations. Marking a function with `@ExposeAbi` instructs the compiler to return a boxed instance of the struct instead.
+By default, functions returning structs are lowered to avoid allocations. Marking a function with `@ExposeAbi` instructs the compiler to return a boxed instance of the struct instead. However, this will only incur an allocation when called from outside the lowered context, as a lowered version of the function will still be generated for internal calls.
 
 #### 3.2.2. Use Case
 
@@ -208,24 +166,23 @@ fun add(a: Vec2, b: Vec2): Vec2 {
 Without the `@ExposeAbi` annotation:
 
 ```kotlin
-fun __structFn$add(
+fun __structFn$Vec2$add(
     ax: Float, ay: Float,
     bx: Float, by: Float,
-    out: StructCarrier$Vec2
+    out: __StructCarrier$Vec2
 ) {
-    out.x = ax + bx
-    out.y = ay + by
+    __structCtor$Vec2(ax + bx, ay + by, out)
 }
 ```
 
-When the annotation is not applied, the original function is rewritten in IR. This is also done to reduce the synthetic symbol explosion. But when `@ExposeAbi` is applied, we would generate:
+When the annotation is not applied, the original function is rewritten in IR. This is also done to reduce the synthetic symbol explosion. But when `@ExposeAbi` is applied, we would generate an additional function to keep the original signature:
 
 ```kotlin
 @ExposeAbi
 fun add(a: Vec2, b: Vec2): Vec2 {
-    val out = StructCarrier$Vec2(0f, 0f)
-    __structFn$add(a.x, a.y, b.x, b.y, out)
-    return Vec2(out.x, out.y) // Boxing step
+    val out = __StructCarrier$Vec2()
+    __structCtor$Vec2(a.x + b.x, a.y + b.y, out)
+    return Vec2(out.x, out.y, __StructSyntheticCtor) // Boxing step
 }
 ```
 
@@ -235,65 +192,185 @@ in addition to the lowered function. This way, the user-visible API remains unch
 
 ## 4. Conceptual Lowering Model
 
-### 4.1. User View
+### 4.1. User Written Code
 
-User code is written as normal immutable classes:
+User code is written as normal immutable classes. For example, consider the following `AABB` class. We will be using this class as a running example throughout this section so that the lowering steps are easier to follow.
 
 ```kotlin
-val a = Vec2(1f, 2f)
-val b = Vec2(3f, 4f)
-val c = a + b         // Returns a new Vec2
+@Struct
+class AABB(
+    val xMin: Float,
+    val yMin: Float,
+    val xMax: Float,
+    val yMax: Float
+) {
+    init {
+        require(xMin <= xMax) { "xMin must be less than or equal to xMax" }
+        require(yMin <= yMax) { "yMin must be less than or equal to yMax" }
+    }
+
+    constructor(topLeft: Vec2, bottomRight: Vec2) : this(
+        topLeft.x, topLeft.y,
+        bottomRight.x, bottomRight.y
+    )
+
+    constructor(topLeft: Vec2, width: Float, height: Float) : this(
+        topLeft.x, topLeft.y,
+        topLeft.x + width, topLeft.y + height
+    )
+
+    operator fun plus(other: AABB): AABB = AABB(
+        xMin + other.xMin,
+        yMin + other.yMin,
+        xMax + other.xMax,
+        yMax + other.yMax
+    )
+}
 ```
 
 From the user's perspective:
 
-- `Vec2` is an immutable class.
-- Operations like `plus` return new instances.
-- No mutable state is observable.
+- Class is fully immutable
+- No visible mutable state
+- Easy to read, write and maintain
 
-### 4.2. Lowered View
+### 4.2. Rewritten AABB class
 
-Internally, the compiler plugin rewrites the above code to use mutable carriers and primitive parameters, achieving allocation-free performance:
+The first step is to rewrite the original class to remove secondary constructors and init blocks, replacing them with synthetic functions, so that a synthetic constructor can be used to construct during boxing cases without running initializers again.
 
-```kotlin
-val c = StructCarrier$Vec2(0f, 0f)
-__structFn$Vec2$plus(
-    1f, 2f,            // a.x, a.y
-    3f, 4f,            // b.x, b.y
-    c                  // out carrier
-)
-```
-
-- No `Vec2` instances are created at runtime.
-- Values are passed as primitives.
-- Result is written into a temporary slot.
-
-This preserves:
-
-- Immutable semantics
-- Referential transparency
-- Predictable performance
-
-### 4.3. Mutable Carrier Generation
-
-For every `@Struct` class, the compiler plugin generates an internal mutable carrier class used for lowering.
-
-**Example:**
-
-Given:
+We rewrite the above class to:
 
 ```kotlin
 @Struct
-class Vec2(val x: Float, val y: Float)
+class AABB {
+
+    val xMin: Float
+    val yMin: Float
+    val xMax: Float
+    val yMax: Float
+
+    constructor(
+        xMin: Float,
+        yMin: Float,
+        xMax: Float,
+        yMax: Float,
+        /* synthetic, unused */ marker: __StructSyntheticCtor
+    ) {
+        this.xMin = xMin
+        this.yMin = yMin
+        this.xMax = xMax
+        this.yMax = yMax
+    }
+
+    constructor(
+        xMin: Float,
+        yMin: Float,
+        xMax: Float,
+        yMax: Float
+    ) : this(xMin, yMin, xMax, yMax, __StructSyntheticCtor) {
+        __structFn$AABB$init(xMin, yMin, xMax, yMax)
+    }
+
+    constructor(topLeft: Vec2, bottomRight: Vec2) : this(
+        topLeft.x, topLeft.y,
+        bottomRight.x, bottomRight.y
+    )
+
+    constructor(topLeft: Vec2, width: Float, height: Float) : this(
+        topLeft.x, topLeft.y,
+        topLeft.x + width, topLeft.y + height
+    )
+
+    fun plus(other: AABB): AABB = AABB(
+        xMin + other.xMin,
+        yMin + other.yMin,
+        xMax + other.xMax,
+        yMax + other.yMax
+    )
+}
+
+/* synthetic */ fun __structFn$AABB$init(
+    xMin: Float,
+    yMin: Float,
+    xMax: Float,
+    yMax: Float,
+) {
+    require(xMin <= xMax) { "xMin must be less than or equal to xMax" }
+    require(yMin <= yMax) { "yMin must be less than or equal to yMax" }
+}
 ```
 
-The plugin generates:
+This rewritten class is functionally equivalent to the original, but with explicit synthetic constructors and initializer functions to facilitate lowering. This allows us to avoid re-running initializers during boxing operations, but existing APIs remain unchanged in behaviour.
+
+> If there is no `init` block, we still generate an empty `__structFn$<StructName>$init` function to keep the lowering steps uniform and simple.
+
+### 4.3. Signature Mangling Strategy
+
+To avoid symbol collisions and to make it easier to reason about lowered functions, we employ a consistent naming scheme for all generated symbols. We follow a four-part naming convention joined by `$` symbol:
+
+1. Prefix. This is used to indicate the kind of synthetic function.
+    - `__StructCarrier` for mutable carrier classes
+    - `__structInit` for initializer functions
+    - `__structCtor` for constructors
+    - `__structFn` for normal functions
+2. Associated name.
+    - For constructors and initializers, this is the name of the struct class.
+    - For functions:
+        - If defined inside a class, this is the name of the enclosing class.
+        - If is an extension function, this is the name of the receiver class.
+        - For operator functions, this is always the name of the receiver class.
+3. Function Name. The name of the function being lowered.
+    - For constructors, this is omitted.
+    - For initializers, this is `init`.
+    - For carrier classes, this is omitted.
+4. Signature Suffix. A suffix representing the flattened parameter types. This is absent for init functions and carrier classes.
+
+Rules for signature suffix generation:
+
+- Each primitive type is represented by a single character:
+    - `B` for `Byte`
+    - `C` for `Char`
+    - `S` for `Short`
+    - `I` for `Int`
+    - `F` for `Float`
+    - `D` for `Double`
+    - `J` for `Long`
+    - `Z` for `Boolean`
+- `O` is used as a synthetic marker for constructors.
+- `X` is used to represent lambda function types, followed by the number of parameters and `1` if there is a return type or `0` if `Unit` (e.g., `X21` for `(Int, Float) -> Int`, `X20` for `(Int, Float) -> Unit`).
+- For other types, we use `L` followed by length of the type name and the type name itself (e.g., `L3com7example4Vec2` for `com.example.Vec2`).
+- For multiple parameters, we concatenate their representations in order.
+- We end with return type representation if applicable, or `V` for `Unit`.
+
+Note that we distinguish between init blocks and regular functions, because it is perfectly valid to have a function in Kotlin named `init`.
+
+Taking the `AABB` example again, here are some example mangled signatures:
+
+- Mutable Carrier Class: `__StructCarrier$AABB`
+- Initializer Function: `__structFn$AABB$init`
+- Constructors:
+    - Boxing Constructor (4 Floats + Synthetic Marker): `__structCtor$AABB$FFFFO`
+    - Primary (4 Floats): `__structCtor$AABB$FFFF`
+    - Secondary (Vec2, Vec2): `__structCtor$AABB$L3com7example4Vec2L3com7example4Vec2`
+    - Secondary (Vec2, 2 Floats): `__structCtor$AABB$L3com7example4Vec2FF`
+- Functions:
+    - `plus` Function (`AABB.(AABB) -> AABB`): `__structFn$AABB$plus$L3com7example4AABBL3com7example4AABB$L3com7example4AABB`
+
+Each of the above symbols generated will be explained in the following sections.
+
+> For lambdas, Kotlin represents (Int) -> Unit as `Function1<Int, Unit>` but since generics are type erased, we don't need to represent them as those will be impossible to link to. Instead we use the `X` notation described above.
+
+### 4.4. Mutable Carrier Generation
+
+In the second step of lowering, for every `@Struct` class, the compiler plugin generates an internal mutable carrier class used for lowering. Let's see the same `AABB` example again.
 
 ```kotlin
-class StructCarrier$Vec2(
-    var x: Float,
-    var y: Float
-)
+/* synthetic */ class __StructCarrier$AABB {
+    var xMin: Float = 0f
+    var yMin: Float = 0f
+    var xMax: Float = 0f
+    var yMax: Float = 0f
+}
 ```
 
 However, this carrier class is **not** visible to users and is only used internally by the compiler during lowering for return values and temporary storage.
@@ -303,32 +380,73 @@ However, this carrier class is **not** visible to users and is only used interna
 - Never escape into user visible APIs
 - Mutation is only performed by compiler-generated code
 
-While this does not guarantee zero allocations, it allows the compiler to optimize away most allocations in practice.
+While this does not guarantee zero allocations, it allows the compiler to optimize away most allocations in practice. Also, we have plans on adding SROA and other optimizations in future versions to further reduce allocations for struct types.
 
-### 4.4. Function Signature Lowering
+### 4.4. Constructor Lowering
 
-All functions that take or return structs are rewritten to use primitive parameters whenever possible and mutable carriers for return values.
-
-**Source:**
+Constructors are lowered to initialize mutable carriers instead of allocating new instances. This is done by generating synthetic constructor functions that take primitive parameters and a mutable carrier to write into. Taking the same `AABB` example again, the constructor lowering would look like this:
 
 ```kotlin
-fun add(a: Vec2, b: Vec2): Vec2 {
-    return Vec2(a.x + b.x, a.y + b.y)
-}
-```
-
-**Conceptual Lowered Form:**
-
-```kotlin
-fun __structFn$add(
-    ax: Float, ay: Float,
-    bx: Float, by: Float,
-    out: StructCarrier$Vec2
+/* synthetic */ fun __structCtor$AABB$FFFFO(
+    xMin: Float,
+    yMin: Float,
+    xMax: Float,
+    yMax: Float,
+    /* synthetic, unused */ marker: __StructSyntheticCtor,
+    out: __StructCarrier$AABB
 ) {
-    out.x = ax + bx
-    out.y = ay + by
+    out.xMin = xMin
+    out.yMin = yMin
+    out.xMax = xMax
+    out.yMax = yMax
+}
+
+/* synthetic */ fun __structCtor$AABB$FFFF(
+    xMin: Float,
+    yMin: Float,
+    xMax: Float,
+    yMax: Float,
+    out: __StructCarrier$AABB
+) {
+    __structCtor$AABB$FFFFO(
+        xMin, yMin, xMax, yMax,   // Actual values
+        __StructSyntheticCtor,    // Synthetic marker
+        out                       // Mutable carrier to write into
+    )
+
+    __structFn$AABB$init(xMin, yMin, xMax, yMax)
+}
+
+/* synthetic */ fun __structCtor$AABB$L3com7example4Vec2L3com7example4Vec2(
+    topLeft$x: Float, topLeft$y: Float,
+    bottomRight$x: Float, bottomRight$y: Float,
+    out: __StructCarrier$AABB
+) {
+    __structCtor$AABB$FFFF(
+        topLeft$x, topLeft$y,
+        bottomRight$x, bottomRight$y,
+        out
+    )
+}
+
+/* synthetic */ fun __structCtor$AABB$L3com7example4Vec2FF(
+    topLeft$x: Float, topLeft$y: Float,
+    width: Float, height: Float,
+    out: __StructCarrier$AABB
+) {
+    __structCtor$AABB$FFFF(
+        topLeft$x, topLeft$y,
+        topLeft$x + width, topLeft$y + height,
+        out
+    )
 }
 ```
+
+When we construct an `AABB`, instead of allocating a new instance, we write into a caller-provided mutable carrier. This allows us to avoid allocations during construction, especially for temporary values as plugin can reuse carriers when proven safe.
+
+### 4.5. Function Signature Lowering
+
+Functions that take or return structs are rewritten to use primitive parameters and mutable carriers. The core principles of function lowering are:
 
 - Parameters are expanded into primitives.
 - Return value is written into a caller-provided mutable carrier.
@@ -336,9 +454,31 @@ fun __structFn$add(
 
 However we will only flatten the parameters when possible. If the struct is passed around as a whole (e.g., stored in a collection), we will pass the carrier object instead.
 
-#### 4.4.1. Parameter Flattening
+While this is similar in concept to constructor lowering, there are additional considerations to take into account, especially regarding JVM parameter limits and suspension semantics that are discussed below.
 
-##### 4.4.1.1. Why Flatten Parameters?
+Going by the above rules, the `plus` function in the `AABB` class would be lowered as follows:
+
+```kotlin
+/* synthetic */ fun __structFn$AABB$plus$L3com7example4AABB$L3com7example4AABB(
+    this$xMin: Float, this$yMin: Float,
+    this$xMax: Float, this$yMax: Float,
+    other$xMin: Float, other$yMin: Float,
+    other$xMax: Float, other$yMax: Float,
+    out: __StructCarrier$AABB
+) {
+    __structCtor$AABB$FFFF(
+        this$xMin + other$xMin,
+        this$yMin + other$yMin,
+        this$xMax + other$xMax,
+        this$yMax + other$yMax,
+        out
+    )
+}
+```
+
+#### 4.5.1. Parameter Flattening
+
+##### 4.5.1.1. Why Flatten Parameters?
 
 Flattening parameters into primitives allows:
 
@@ -353,7 +493,7 @@ But it increases the number of parameters, which can have trade-offs. If we flat
 - Bloats signatures
 - Inreases stack pressure post optimizations
 
-##### 4.4.1.2. JVM Descriptor Units
+##### 4.5.1.2. JVM Descriptor Units
 
 In the Java Language Specification, there is mentioning of limits on the number of parameters a method can have, measured in "descriptor units". The rules are as follows:
 
@@ -363,7 +503,7 @@ In the Java Language Specification, there is mentioning of limits on the number 
 
 The JVM specification mandates a maximum of 255 descriptor units for method parameters. Exceeding this limit results in a `java.lang.VerifyError` at runtime.
 
-##### 4.4.1.3. Flattening Limit Policy
+##### 4.5.1.3. Flattening Limit Policy
 
 To balance the benefits of parameter flattening with the risks of exceeding JVM limits, the compiler plugin employs the following policy:
 
@@ -376,7 +516,7 @@ To balance the benefits of parameter flattening with the risks of exceeding JVM 
 
 This conservative limit ensures that even after optimizations, the method signatures remain within safe bounds across all target platforms.
 
-##### 4.4.1.4. Partial Flattening
+##### 4.5.1.4. Partial Flattening
 
 If flattening all struct parameters would exceed the 128-unit limit, the plugin falls back to passing some structs as whole carrier objects instead of flattening them.
 
@@ -389,7 +529,7 @@ fun f(a: Vec2, b: BigStruct, c: Vec2)
 Might be lowered to:
 
 ```kotlin
-fun __structFn$f(
+fun __structFn$f$L3com7example4Vec2L3com7example9BigStructL3com7example4Vec2(
     ax: Float, ay: Float,          // Flattened Vec2 'a'
     b: BigStruct,                  // Passed as carrier
     cx: Float, cy: Float           // Flattened Vec2 'c'
@@ -400,15 +540,15 @@ This ensures that the total descriptor units remain within the defined limit whi
 
 **We employ greedy flattening**: we flatten as many struct parameters as possible without exceeding the limit, prioritizing smaller structs first.
 
-### 4.5. Suspension Semantics
+### 4.6. Suspension Semantics
 
 Suspend functions and lambdas are rewritten similarly, with mutable carriers allocated per coroutine region.
 
-#### 4.5.1. Definitions
+#### 4.6.1. Definitions
 
 To reason about correctness, reuse, and safety of mutable struct carriers, the following terms are used throughout this specification.
 
-##### 4.5.1.1. Suspension Point
+##### 4.6.1.1. Suspension Point
 
 A **suspension point** is a program location where execution of the current coroutine **may suspend** and later **resume**.
 
@@ -424,7 +564,7 @@ Examples include:
 - `await(...)`
 - Any user-defined suspend function call
 
-##### 4.5.1.2. Suspension Region
+##### 4.6.1.2. Suspension Region
 
 A **suspension region** is a contigous region of execution within a coroutine **between two suspension points**, or between:
 
@@ -441,7 +581,7 @@ Within a single suspension region:
 
 Suspension regions are **conceptual**, not syntactic, and are defined by control flow.
 
-##### 4.5.1.3. Context Switch
+##### 4.6.1.3. Context Switch
 
 A **context switch** occurs when a suspended coroutine resumes execution:
 
@@ -451,7 +591,7 @@ A **context switch** occurs when a suspended coroutine resumes execution:
 
 Context switches are **implicit** and **unobservable** to user code, except through ordering effects.
 
-#### 4.5.2. Core Rule
+#### 4.6.2. Core Rule
 
 Mutable carriers are allowed to be reused across suspension regions as long as **they do not escape into different execution context**.
 
@@ -461,7 +601,7 @@ A mutable carrier is considered to **escape into a different context** if **any*
 2. It is **stored** in a data structure that outlives the suspension region
 3. It is **shared** across concurrently executing coroutine paths
 
-#### 4.5.3. Context Switch Safety
+#### 4.6.3. Context Switch Safety
 
 A carrier **does not escape** merely because:
 
@@ -480,9 +620,9 @@ Only context switches require new carrier allocation. A new mutable carrier **mu
 
 These create new coroutine contexts.
 
-#### 4.5.4. Examples
+#### 4.6.4. Examples
 
-##### 4.5.4.1. Reuse across Suspension Regions
+##### 4.6.4.1. Reuse across Suspension Regions
 
 **Source:**
 
@@ -498,15 +638,15 @@ suspend fun moveTwice(p: Vec2, delta: Vec2): Vec2 {
 **Lowered Conceptual Form:**
 
 ```kotlin
-suspend fun __structFn$moveTwice(
+suspend fun __structFn$moveTwice$L3com7example4Vec2L3com7example4Vec2$L3com7example4Vec2(
     px: Float, py: Float,
     dx: Float, dy: Float,
-    out: StructCarrier$Vec2
+    out: __StructCarrier$Vec2
 ) {
-    val r = StructCarrier$Vec2(0f, 0f)
-    __structFn$Vec2$plus(px, py, dx, dy, r)   // r = p + delta
-    delay(100)                                // Suspension point
-    __structFn$Vec2$plus(r.x, r.y, dx, dy, r) // r = r + delta
+    val r = __StructCarrier$Vec2()
+    __structFn$Vec2$plus$L3com7example4Vec2(px, py, dx, dy, r)   // r = p + delta
+    delay(100)                                                   // Suspension point
+    __structFn$Vec2$plus$L3com7example4Vec2(r.x, r.y, dx, dy, r) // r = r + delta
     out.x = r.x
     out.y = r.y
 }
@@ -518,7 +658,7 @@ suspend fun __structFn$moveTwice(
 - `out` is not captured
 - Resumption thread does not matter
 
-##### 4.5.4.2. New Lambda Context
+##### 4.6.4.2. New Lambda Context
 
 **Source:**
 
@@ -534,18 +674,18 @@ suspend fun f(pos: Vec2, delta: Vec2) {
 **Lowered Conceptual Form:**
 
 ```kotlin
-suspend fun __structFn$f(
+suspend fun __structFn$f$L3com7example4Vec2L3com7example4Vec2(
     posx: Float, posy: Float,
     deltax: Float, deltay: Float
 ) {
-    val r = StructCarrier$Vec2(0f, 0f)
-    __structFn$Vec2$plus(posx, posy, deltax, deltay, r) // r = pos + delta
+    val r = __StructCarrier$Vec2()
+    __structFn$Vec2$plus$L3com7example4Vec2(posx, posy, deltax, deltay, r) // r = pos + delta
 
     withContext(Dispatchers.Default) {
-        val r2 = StructCarrier$Vec2(0f, 0f) // New carrier for lambda
+        val r2 = __StructCarrier$Vec2() // New carrier for lambda
         r2.x = r.x
         r2.y = r.y
-        println(Vec2(r2.x, r2.y)) // Boxing step for 'Any'
+        println(Vec2(r2.x, r2.y, __StructSyntheticCtor)) // Boxing step for 'Any'
     }
 }
 ```
@@ -556,7 +696,7 @@ suspend fun __structFn$f(
 - `r` is captured by the lambda
 - Mutating `r` in new context would be unsafe
 
-### 4.6. Lambdas and Function Types
+### 4.7. Lambdas and Function Types
 
 Function types involving structs are rewritten similarly to normal functions.
 
@@ -576,13 +716,13 @@ suspend fun withCallback(
 **Lowered Conceptual Form:**
 
 ```kotlin
-suspend fun __structFn$withCallback(
+suspend fun __structFn$withCallback$L3com7example4Vec2L3com7example4Vec2X10(
     posx: Float, posy: Float,
     deltax: Float, deltay: Float,
     block: suspend (Float, Float) -> Unit
 ) {
-    val newPos = StructCarrier$Vec2(0f, 0f)
-    __structFn$Vec2$plus(posx, posy, deltax, deltay, newPos) // newPos = pos + delta
+    val newPos = __StructCarrier$Vec2()
+    __structFn$Vec2$plus$L3com7example4Vec2(posx, posy, deltax, deltay, newPos) // newPos = pos + delta
 
     // Call the suspend lambda with flattened parameters
     block(newPos.x, newPos.y)
@@ -595,7 +735,7 @@ suspend fun __structFn$withCallback(
 - Prevents implicit boxing of structs.
 - Lambda signatures are part of IR rewriting.
 
-### 4.7. Boxing Boundaries
+### 4.8. Boxing Boundaries
 
 Structs are boxed **only** when crossing explicit ABI boundaries, such as:
 
@@ -604,14 +744,13 @@ Structs are boxed **only** when crossing explicit ABI boundaries, such as:
 - Functions that return `Any`
 - Passing structs to parameters of Generic Types
 
-### 4.8. Diagnostics & Safety Checks
+### 4.9. Diagnostics & Safety Checks
 
 The compiler plugin emits FIR diagnostics for:
 
 - Identity checks (`===`, `!==`)
 - Mutable fields
 - Unsupported field types
-- Impure initialization
 - Struct inheritance
 
 The goal is to prevent silent semantic changes and guide users toward safe patterns.

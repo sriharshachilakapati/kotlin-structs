@@ -30,7 +30,7 @@ This proposal introduces a compiler plugin–based solution that provides struct
 The goal of this plugin is to enable struct-like performance using immutable Kotlin classes. The following are the characteristics of this proposal.
 
 - Immutable by default
-- Allocation-free for most operations
+- Allocation-free for operations whenever possible
 - Explicit boxing only at well-defined boundaries
 - Prefictable and portable performance across platforms
 
@@ -45,14 +45,13 @@ The goal of this plugin is to enable struct-like performance using immutable Kot
 
 #### 2.1.2. Allocation Elimination
 
-- No heap allocation for:
-    - Intermediate expressions
-    - Temporary values
-    - Function return values
-- Allocation only occurs when:
-    - Crossing Generic / Any boundaries
-    - When used in Arrays
-    - Explicitly exposing ABI
+We want to eliminate object allocations as much a possible. While it is not 100% allocation-free, we aim to reduce allocations as much as possible by automatically reusing mutable carriers.
+
+Allocation will still be incurred in the following scenarios:
+
+- Crossing explicit ABI boundaries (e.g., Java interop)
+- Storing in collections or generic types
+- Returning or passing to `Any` parameters
 
 #### 2.1.3. Predictable Performance
 
@@ -170,8 +169,9 @@ fun __structFn$Vec2$add(
     ax: Float, ay: Float,
     bx: Float, by: Float,
     out: __StructCarrier$Vec2
-) {
+): __StructCarrier$Vec2 {
     __structCtor$Vec2(ax + bx, ay + by, out)
+    return out
 }
 ```
 
@@ -382,7 +382,7 @@ However, this carrier class is **not** visible to users and is only used interna
 
 While this does not guarantee zero allocations, it allows the compiler to optimize away most allocations in practice. Also, we have plans on adding SROA and other optimizations in future versions to further reduce allocations for struct types.
 
-### 4.4. Constructor Lowering
+### 4.5. Constructor Lowering
 
 Constructors are lowered to initialize mutable carriers instead of allocating new instances. This is done by generating synthetic constructor functions that take primitive parameters and a mutable carrier to write into. Taking the same `AABB` example again, the constructor lowering would look like this:
 
@@ -444,7 +444,7 @@ Constructors are lowered to initialize mutable carriers instead of allocating ne
 
 When we construct an `AABB`, instead of allocating a new instance, we write into a caller-provided mutable carrier. This allows us to avoid allocations during construction, especially for temporary values as plugin can reuse carriers when proven safe.
 
-### 4.5. Function Signature Lowering
+### 4.6. Function Signature Lowering
 
 Functions that take or return structs are rewritten to use primitive parameters and mutable carriers. The core principles of function lowering are:
 
@@ -465,7 +465,7 @@ Going by the above rules, the `plus` function in the `AABB` class would be lower
     other$xMin: Float, other$yMin: Float,
     other$xMax: Float, other$yMax: Float,
     out: __StructCarrier$AABB
-) {
+): __StructCarrier$AABB {
     __structCtor$AABB$FFFF(
         this$xMin + other$xMin,
         this$yMin + other$yMin,
@@ -473,12 +473,13 @@ Going by the above rules, the `plus` function in the `AABB` class would be lower
         this$yMax + other$yMax,
         out
     )
+    return out
 }
 ```
 
-#### 4.5.1. Parameter Flattening
+#### 4.6.1. Parameter Flattening
 
-##### 4.5.1.1. Why Flatten Parameters?
+##### 4.6.1.1. Why Flatten Parameters?
 
 Flattening parameters into primitives allows:
 
@@ -493,7 +494,7 @@ But it increases the number of parameters, which can have trade-offs. If we flat
 - Bloats signatures
 - Inreases stack pressure post optimizations
 
-##### 4.5.1.2. JVM Descriptor Units
+##### 4.6.1.2. JVM Descriptor Units
 
 In the Java Language Specification, there is mentioning of limits on the number of parameters a method can have, measured in "descriptor units". The rules are as follows:
 
@@ -503,7 +504,7 @@ In the Java Language Specification, there is mentioning of limits on the number 
 
 The JVM specification mandates a maximum of 255 descriptor units for method parameters. Exceeding this limit results in a `java.lang.VerifyError` at runtime.
 
-##### 4.5.1.3. Flattening Limit Policy
+##### 4.6.1.3. Flattening Limit Policy
 
 To balance the benefits of parameter flattening with the risks of exceeding JVM limits, the compiler plugin employs the following policy:
 
@@ -516,7 +517,7 @@ To balance the benefits of parameter flattening with the risks of exceeding JVM 
 
 This conservative limit ensures that even after optimizations, the method signatures remain within safe bounds across all target platforms.
 
-##### 4.5.1.4. Partial Flattening
+##### 4.6.1.4. Partial Flattening
 
 If flattening all struct parameters would exceed the 128-unit limit, the plugin falls back to passing some structs as whole carrier objects instead of flattening them.
 
@@ -540,15 +541,15 @@ This ensures that the total descriptor units remain within the defined limit whi
 
 **We employ greedy flattening**: we flatten as many struct parameters as possible without exceeding the limit, prioritizing smaller structs first.
 
-### 4.6. Suspension Semantics
+### 4.7. Suspension Semantics
 
 Suspend functions and lambdas are rewritten similarly, with mutable carriers allocated per coroutine region.
 
-#### 4.6.1. Definitions
+#### 4.7.1. Definitions
 
 To reason about correctness, reuse, and safety of mutable struct carriers, the following terms are used throughout this specification.
 
-##### 4.6.1.1. Suspension Point
+##### 4.7.1.1. Suspension Point
 
 A **suspension point** is a program location where execution of the current coroutine **may suspend** and later **resume**.
 
@@ -564,7 +565,7 @@ Examples include:
 - `await(...)`
 - Any user-defined suspend function call
 
-##### 4.6.1.2. Suspension Region
+##### 4.7.1.2. Suspension Region
 
 A **suspension region** is a contigous region of execution within a coroutine **between two suspension points**, or between:
 
@@ -581,7 +582,7 @@ Within a single suspension region:
 
 Suspension regions are **conceptual**, not syntactic, and are defined by control flow.
 
-##### 4.6.1.3. Context Switch
+##### 4.7.1.3. Context Switch
 
 A **context switch** occurs when a suspended coroutine resumes execution:
 
@@ -591,7 +592,7 @@ A **context switch** occurs when a suspended coroutine resumes execution:
 
 Context switches are **implicit** and **unobservable** to user code, except through ordering effects.
 
-#### 4.6.2. Core Rule
+#### 4.7.2. Core Rule
 
 Mutable carriers are allowed to be reused across suspension regions as long as **they do not escape into different execution context**.
 
@@ -601,7 +602,7 @@ A mutable carrier is considered to **escape into a different context** if **any*
 2. It is **stored** in a data structure that outlives the suspension region
 3. It is **shared** across concurrently executing coroutine paths
 
-#### 4.6.3. Context Switch Safety
+#### 4.7.3. Context Switch Safety
 
 A carrier **does not escape** merely because:
 
@@ -620,9 +621,9 @@ Only context switches require new carrier allocation. A new mutable carrier **mu
 
 These create new coroutine contexts.
 
-#### 4.6.4. Examples
+#### 4.7.4. Examples
 
-##### 4.6.4.1. Reuse across Suspension Regions
+##### 4.7.4.1. Reuse across Suspension Regions
 
 **Source:**
 
@@ -658,7 +659,7 @@ suspend fun __structFn$moveTwice$L3com7example4Vec2L3com7example4Vec2$L3com7exam
 - `out` is not captured
 - Resumption thread does not matter
 
-##### 4.6.4.2. New Lambda Context
+##### 4.7.4.2. New Lambda Context
 
 **Source:**
 
@@ -696,7 +697,7 @@ suspend fun __structFn$f$L3com7example4Vec2L3com7example4Vec2(
 - `r` is captured by the lambda
 - Mutating `r` in new context would be unsafe
 
-### 4.7. Lambdas and Function Types
+### 4.8. Lambdas and Function Types
 
 Function types involving structs are rewritten similarly to normal functions.
 
@@ -735,7 +736,7 @@ suspend fun __structFn$withCallback$L3com7example4Vec2L3com7example4Vec2X10(
 - Prevents implicit boxing of structs.
 - Lambda signatures are part of IR rewriting.
 
-### 4.8. Boxing Boundaries
+### 4.9. Boxing Boundaries
 
 Structs are boxed **only** when crossing explicit ABI boundaries, such as:
 
@@ -744,7 +745,7 @@ Structs are boxed **only** when crossing explicit ABI boundaries, such as:
 - Functions that return `Any`
 - Passing structs to parameters of Generic Types
 
-### 4.9. Diagnostics & Safety Checks
+### 4.10. Diagnostics & Safety Checks
 
 The compiler plugin emits FIR diagnostics for:
 
@@ -790,7 +791,7 @@ The following strategies were evaluated:
 
 ## 7. Benchmark Results
 
-### 7.1 Kotlin/JS (Node.js)
+### 7.1. Kotlin/JS (Node.js)
 
 ```
 js summary:
@@ -818,7 +819,7 @@ Manual struct emulation is catastrophically slow on JS. Mutable object reuse is 
 
 ---
 
-### 7.2 Kotlin/Native (Linux x64)
+### 7.2. Kotlin/Native (Linux x64)
 
 ```
 linuxX64 summary:
@@ -846,7 +847,7 @@ Native benefits from scalarization, but mutable classes remain consistently fast
 
 ---
 
-### 7.3 JVM (HotSpot)
+### 7.3. JVM (HotSpot)
 
 ```
 jvm summary:
@@ -888,7 +889,7 @@ All other strategies introduce:
 
 ## 9. Compiler Architecture
 
-### 9.1 FIR Phase Responsibilities
+### 9.1. FIR Phase Responsibilities
 
 - Detect `@Struct`
 - Validate constraints
@@ -896,7 +897,7 @@ All other strategies introduce:
 - Attach metadata
 - Respect `@ExposeAbi`
 
-### 9.2 IR Phase Responsibilities
+### 9.2. IR Phase Responsibilities
 
 - Rewrite function bodies
 - Rewrite call sites
@@ -907,15 +908,15 @@ All other strategies introduce:
 
 ## 10. Testing Strategy
 
-### 10.1 Compile-Time Tests
+### 10.1. Compile-Time Tests
 
 - FIR diagnostics
 - IR symbol verification
 - IR text dumps
 
-### 10.2 Runtime Correctness Tests
+### 10.2. Runtime Correctness Tests
 
-TODO: Expand
+We will setup a runtime correctness test suite, where two compilations will be performed on the same sources – one with the struct plugin enabled, and one without. Then both versions will be run and their outputs compared for equality.
 
 ---
 
@@ -955,9 +956,7 @@ The design deliberately starts conservative, establishing a solid foundation for
 
 This section documents alternative designs that were explored during the research and benchmarking phase, along with concrete reasons for rejecting them in V1.
 
----
-
-### 13.1 Slot-Based Return Using Primitive Arrays
+### 13.1. Slot-Based Return Using Primitive Arrays
 
 **Description**
 
@@ -990,9 +989,7 @@ fun add(
 
 Rejected for V1. May be reconsidered for niche cases in V2.
 
----
-
-### 13.2 Packed Return Values (Bit Packing)
+### 13.2. Packed Return Values (Bit Packing)
 
 **Description**
 
@@ -1021,9 +1018,7 @@ Consistently slower than mutable class lowering on all platforms.
 
 Rejected.
 
----
-
-### 13.3 ByteBuffer / TypedArray Struct Storage
+### 13.3. ByteBuffer / TypedArray Struct Storage
 
 **Description**
 
@@ -1042,9 +1037,7 @@ Structs stored in flat buffers (similar to LWJGL `MemoryStack` or C structs).
 
 Out of scope for this plugin. Better suited for explicit low-level libraries.
 
----
-
-### 13.4 Thread-Local Slot Pools
+### 13.4. Thread-Local Slot Pools
 
 **Description**
 
@@ -1061,9 +1054,7 @@ Reuse struct slots via `ThreadLocal` object pools.
 
 Rejected outright.
 
----
-
-### 13.5 Escape-Analysis-Driven Scalarization in Plugin
+### 13.5. Escape-Analysis-Driven Scalarization in Plugin
 
 **Description**
 
@@ -1081,9 +1072,7 @@ Implement full escape analysis in the compiler plugin to avoid allocations.
 
 Deferred to potential future research (V3+).
 
----
-
-### 13.6 Relying Solely on JVM Escape Analysis
+### 13.6. Relying Solely on JVM Escape Analysis
 
 **Description**
 
@@ -1100,9 +1089,7 @@ Trust JVM HotSpot to optimize immutable classes automatically.
 
 Insufficient for KMP goals.
 
----
-
-### 13.7 Value Classes (Inline Classes)
+### 13.7. Value Classes (Inline Classes)
 
 **Description**
 
@@ -1120,9 +1107,7 @@ Use value classes as struct replacements.
 
 Not applicable.
 
----
-
-### 13.8 Treating Structs as Arrays in User Code
+### 13.8. Treating Structs as Arrays in User Code
 
 **Description**
 
